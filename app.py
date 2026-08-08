@@ -1,5 +1,6 @@
 import streamlit as st
 import tensorflow as tf
+import tensorflow as tf
 import pickle
 import re
 import string
@@ -43,7 +44,10 @@ MAX_LEN = 153
 # ----------------------------
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("stress_detection_bilstm.new.keras")
+    return tf.keras.models.load_model(
+    "stress_detection_bilstm.new.keras",
+    compile=False
+)
 
 try:
     model = load_model()
