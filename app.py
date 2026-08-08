@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import tensorflow as tf
 import pickle
@@ -24,6 +23,15 @@ st.set_page_config(
 
 
 # ==========================================================
+# CONSTANTS
+# ==========================================================
+
+MAX_LEN = 153
+MODEL_PATH = "stress_detection_bilstm.new.keras"
+TOKENIZER_PATH = "tokenizer (3).pkl"
+
+
+# ==========================================================
 # DOWNLOAD NLTK RESOURCES
 # ==========================================================
 
@@ -39,90 +47,22 @@ except LookupError:
 
 
 # ==========================================================
-# CONSTANTS
-# ==========================================================
-
-MAX_LEN = 153
-VOCAB_SIZE = 8639
-EMBEDDING_DIM = 100
-
-
-# ==========================================================
 # LOAD MODEL
 # ==========================================================
-# IMPORTANT:
-# We rebuild the original BiLSTM architecture and load only
-# the trained weights. This avoids Keras deserialization
-# errors involving InputLayer and Embedding.
 
 @st.cache_resource
 def load_model():
-
-    model = tf.keras.Sequential([
-        tf.keras.layers.Input(
-            shape=(MAX_LEN,)
-        ),
-
-        tf.keras.layers.Embedding(
-            input_dim=VOCAB_SIZE,
-            output_dim=EMBEDDING_DIM
-        ),
-
-        tf.keras.layers.SpatialDropout1D(
-            rate=0.2
-        ),
-
-        tf.keras.layers.Bidirectional(
-            tf.keras.layers.LSTM(
-                64,
-                return_sequences=True
-            )
-        ),
-
-        tf.keras.layers.GlobalMaxPooling1D(),
-
-        tf.keras.layers.Dense(
-            64,
-            activation="relu"
-        ),
-
-        tf.keras.layers.Dropout(
-            0.3
-        ),
-
-        tf.keras.layers.Dense(
-            32,
-            activation="relu"
-        ),
-
-        tf.keras.layers.Dropout(
-            0.2
-        ),
-
-        tf.keras.layers.Dense(
-            1,
-            activation="sigmoid"
-        )
-    ])
-
-    # Build the model before loading weights
-    model.build(input_shape=(None, MAX_LEN))
-
-    # Load trained weights
-    model.load_weights(
-        "stress_detection_bilstm.new.keras"
+    return tf.keras.models.load_model(
+        MODEL_PATH,
+        compile=False
     )
-
-    return model
 
 
 try:
     model = load_model()
-
 except Exception as e:
-    st.error(
-        f"Unable to load model weights: {e}"
-    )
+    st.error("Unable to load the stress detection model.")
+    st.error(str(e))
     st.stop()
 
 
@@ -132,24 +72,15 @@ except Exception as e:
 
 @st.cache_resource
 def load_tokenizer():
-
-    with open(
-        "tokenizer (3).pkl",
-        "rb"
-    ) as file:
-
+    with open(TOKENIZER_PATH, "rb") as file:
         return pickle.load(file)
 
 
 try:
     tokenizer = load_tokenizer()
-
 except Exception as e:
-
-    st.error(
-        f"Unable to load tokenizer: {e}"
-    )
-
+    st.error("Unable to load tokenizer.")
+    st.error(str(e))
     st.stop()
 
 
@@ -157,10 +88,7 @@ except Exception as e:
 # NLP TOOLS
 # ==========================================================
 
-stop_words = set(
-    stopwords.words("english")
-)
-
+stop_words = set(stopwords.words("english"))
 lemmatizer = WordNetLemmatizer()
 
 
@@ -174,26 +102,14 @@ def preprocess_text(text):
     text = text.lower()
 
     # Remove URLs
-    text = re.sub(
-        r"http\S+|www\S+",
-        "",
-        text
-    )
+    text = re.sub(r"http\S+|www\S+", "", text)
 
     # Remove HTML
-    text = re.sub(
-        r"<.*?>",
-        "",
-        text
-    )
+    text = re.sub(r"<.*?>", "", text)
 
     # Remove punctuation
     text = text.translate(
-        str.maketrans(
-            "",
-            "",
-            string.punctuation
-        )
+        str.maketrans("", "", string.punctuation)
     )
 
     # Tokenization
@@ -201,8 +117,7 @@ def preprocess_text(text):
 
     # Remove stopwords
     words = [
-        word
-        for word in words
+        word for word in words
         if word not in stop_words
     ]
 
@@ -221,15 +136,12 @@ def preprocess_text(text):
 
 def predict_stress(text):
 
-    # Preprocess input
     processed = preprocess_text(text)
 
-    # Convert words to sequences
     sequence = tokenizer.texts_to_sequences(
         [processed]
     )
 
-    # Padding
     padded = pad_sequences(
         sequence,
         maxlen=MAX_LEN,
@@ -237,23 +149,16 @@ def predict_stress(text):
         truncating="post"
     )
 
-    # Prediction
     prediction = model.predict(
         padded,
         verbose=0
     )
 
-    probability = float(
-        prediction[0][0]
-    )
+    probability = float(prediction[0][0])
 
-    # Classification
     if probability >= 0.5:
-
         label = "Stress"
-
     else:
-
         label = "No Stress"
 
     return label, probability, processed
@@ -263,28 +168,15 @@ def predict_stress(text):
 # SIDEBAR
 # ==========================================================
 
-st.sidebar.title(
-    "🧠 Stress Detection"
-)
+st.sidebar.title("🧠 Stress Detection")
 
 st.sidebar.markdown("---")
 
-st.sidebar.subheader(
-    "📌 Project Information"
-)
+st.sidebar.subheader("📌 Project Information")
 
-st.sidebar.write(
-    "**Model:** Bidirectional LSTM"
-)
-
-st.sidebar.write(
-    "**Embedding:** GloVe (100 Dimensions)"
-)
-
-st.sidebar.write(
-    "**Dataset:** Stress.csv"
-)
-
+st.sidebar.write("**Model:** Bidirectional LSTM")
+st.sidebar.write("**Embedding:** GloVe (100 Dimensions)")
+st.sidebar.write("**Dataset:** Stress.csv")
 st.sidebar.write(
     f"**Maximum Sequence Length:** {MAX_LEN}"
 )
@@ -292,14 +184,12 @@ st.sidebar.write(
 st.sidebar.markdown("---")
 
 st.sidebar.info(
-    "⚠️ This application is developed for "
-    "educational purposes only and should not "
-    "be considered a medical diagnosis tool."
+    "⚠️ This application is developed for educational "
+    "purposes only and should not be considered a medical "
+    "diagnosis tool."
 )
 
-st.sidebar.subheader(
-    "📊 Model Performance"
-)
+st.sidebar.subheader("📊 Model Performance")
 
 st.sidebar.metric(
     label="Accuracy",
@@ -308,9 +198,7 @@ st.sidebar.metric(
 
 st.sidebar.markdown("---")
 
-st.sidebar.subheader(
-    "⚙️ NLP Pipeline"
-)
+st.sidebar.subheader("⚙️ NLP Pipeline")
 
 st.sidebar.markdown(
     """
@@ -333,12 +221,11 @@ st.sidebar.markdown("---")
 # MAIN PAGE
 # ==========================================================
 
-st.title(
-    "🧠 Stress Detection System"
-)
+st.title("🧠 Stress Detection System")
 
 st.subheader(
-    "AI-Powered Mental Stress Prediction using NLP & Bidirectional LSTM"
+    "AI-Powered Mental Stress Prediction using "
+    "NLP & Bidirectional LSTM"
 )
 
 st.markdown("---")
@@ -353,54 +240,46 @@ st.info(
 # EXAMPLE SENTENCES
 # ==========================================================
 
-st.subheader(
-    "💡 Try an Example"
-)
+st.subheader("💡 Try an Example")
 
 col1, col2 = st.columns(2)
 
-
 with col1:
 
-    if st.button(
-        "😔 Stress Example"
-    ):
+    if st.button("😔 Stress Example"):
 
         st.session_state.text = (
-            "For the past week I've barely been "
-            "sleeping because I'm terrified I'll "
-            "lose my job."
+            "For the past week I've barely been sleeping "
+            "because I'm terrified I'll lose my job."
         )
-
 
 with col2:
 
-    if st.button(
-        "😊 No Stress Example"
-    ):
+    if st.button("😊 No Stress Example"):
 
         st.session_state.text = (
-            "I spent the afternoon hiking with "
-            "friends and enjoyed the beautiful weather."
+            "I spent the afternoon hiking with friends "
+            "and enjoyed the beautiful weather."
         )
+
+
+# ==========================================================
+# INITIALIZE SESSION STATE
+# ==========================================================
+
+if "text" not in st.session_state:
+    st.session_state.text = ""
 
 
 # ==========================================================
 # INPUT AREA
 # ==========================================================
 
-if "text" not in st.session_state:
-
-    st.session_state.text = ""
-
-
 user_input = st.text_area(
     "Enter Text",
     value=st.session_state.text,
     height=180,
-    placeholder=(
-        "Example: I feel overwhelmed because of my work."
-    )
+    placeholder="Example: I feel overwhelmed because of my work."
 )
 
 
@@ -410,18 +289,18 @@ user_input = st.text_area(
 
 col1, col2 = st.columns(2)
 
-
 with col1:
 
     predict = st.button(
-        "🔍 Predict"
+        "🔍 Predict",
+        use_container_width=True
     )
-
 
 with col2:
 
     clear = st.button(
-        "🗑 Clear"
+        "🗑 Clear",
+        use_container_width=True
     )
 
 
@@ -465,23 +344,15 @@ if predict:
 
     else:
 
-        with st.spinner(
-            "Analyzing text..."
-        ):
+        with st.spinner("Analyzing text..."):
 
-            label, probability, processed = (
-                predict_stress(user_input)
+            label, probability, processed = predict_stress(
+                user_input
             )
 
         st.markdown("---")
 
-        st.subheader(
-            "📊 Prediction Result"
-        )
-
-        # ----------------------------------------------
-        # RESULT
-        # ----------------------------------------------
+        st.subheader("📊 Prediction Result")
 
         if label == "Stress":
 
@@ -495,10 +366,6 @@ if predict:
                 "✅ No Stress Detected"
             )
 
-        # ----------------------------------------------
-        # METRICS
-        # ----------------------------------------------
-
         c1, c2 = st.columns(2)
 
         c1.metric(
@@ -511,27 +378,30 @@ if predict:
             label
         )
 
-        # ----------------------------------------------
-        # PROGRESS
-        # ----------------------------------------------
-
         st.progress(
-            probability
+            min(max(probability, 0.0), 1.0)
         )
 
-        # ----------------------------------------------
-        # CONFIDENCE
-        # ----------------------------------------------
 
-        if probability >= 0.90:
+        # ==================================================
+        # CONFIDENCE
+        # ==================================================
+
+        confidence_probability = (
+            probability
+            if label == "Stress"
+            else 1 - probability
+        )
+
+        if confidence_probability >= 0.90:
 
             confidence = "Very High"
 
-        elif probability >= 0.75:
+        elif confidence_probability >= 0.75:
 
             confidence = "High"
 
-        elif probability >= 0.60:
+        elif confidence_probability >= 0.60:
 
             confidence = "Moderate"
 
@@ -543,43 +413,37 @@ if predict:
             f"**Confidence Level:** {confidence}"
         )
 
-        # ----------------------------------------------
+
+        # ==================================================
         # PROCESSED TEXT
-        # ----------------------------------------------
+        # ==================================================
 
-        st.subheader(
-            "📝 Processed Text"
-        )
+        st.subheader("📝 Processed Text")
 
-        st.code(
-            processed
-        )
+        st.code(processed)
 
-        # ----------------------------------------------
-        # SUMMARY
-        # ----------------------------------------------
 
-        st.subheader(
-            "📋 Prediction Summary"
-        )
+        # ==================================================
+        # PREDICTION SUMMARY
+        # ==================================================
+
+        st.subheader("📋 Prediction Summary")
 
         summary = {
-
             "Prediction": label,
-
-            "Confidence":
-                f"{probability * 100:.2f}%",
-
-            "Processed Words":
-                len(processed.split()),
-
-            "Input Words":
-                len(user_input.split())
+            "Stress Probability": (
+                f"{probability * 100:.2f}%"
+            ),
+            "Confidence": confidence,
+            "Processed Words": len(
+                processed.split()
+            ),
+            "Input Words": len(
+                user_input.split()
+            )
         }
 
-        st.json(
-            summary
-        )
+        st.json(summary)
 
 
 # ==========================================================
@@ -592,4 +456,3 @@ st.caption(
     "Developed using TensorFlow, GloVe Embeddings, "
     "Bidirectional LSTM and Streamlit."
 )
-```
